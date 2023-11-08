@@ -91,7 +91,7 @@ def evaluation(config, model, state, data_source, max_steps, last_n=-1, print_pr
             # iterate over batches
             if print_progress and max_steps > 0: 
                 progress_bar = tqdm(range(max_steps))
-            while max_steps == -1 or batch_count <= max_steps:
+            while max_steps == -1 or batch_count < max_steps:
                 if print_progress and max_steps > 0:
                     progress_bar.update(1)
                     progress_bar.refresh()
