@@ -59,7 +59,7 @@ def load_checkpoint(model, path):
     """Loads a model from a checkpoint on disk. """
     new_state_dict = {}
     with open(path, 'rb') as f:
-        checkpoint = torch.load(f)
+        checkpoint = torch.load(f, map_location=model.device)
         model_state_dict = checkpoint["model_state_dict"]
         for key, value in model_state_dict.items():
             new_state_dict[key] = value
