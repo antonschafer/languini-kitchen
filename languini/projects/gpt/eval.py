@@ -131,14 +131,15 @@ def run(config, dedup_type):
     mprint(f"sequence length: {c.seq_len}")
     mprint(f"evalulate last_n tokens per batch: {c.last_n}")
 
-    eval_total_loss, eval_total_topk, eval_token_count, _ = lm_trainer.evaluation(config=c,
+    eval_total_loss, eval_total_topk, eval_token_count, _, full_eval_data = lm_trainer.evaluation(config=c,
                                                                                     model=model,
                                                                                     state=curr_state,
                                                                                     data_source=ds,
                                                                                     max_steps=batch_count,
                                                                                     last_n=c.last_n,
                                                                                     print_progress=True,
-                                                                                    vocab_mapping=eval_vocab_mapping)
+                                                                                    vocab_mapping=eval_vocab_mapping,
+                                                                                    track_full_data=True)
     # loss and ppl over number of tokens
     eval_avg_loss = eval_total_loss / eval_token_count
     eval_ppl = math.exp(eval_avg_loss)
