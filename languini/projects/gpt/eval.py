@@ -164,6 +164,19 @@ def run(config, dedup_type):
     
     mprint("Done!")
 
+    return {
+        "metrics": {
+            "num_tokens": int(eval_token_count),
+            "total_loss": float(eval_total_loss),
+            "avg_loss": float(eval_avg_loss),
+            "ppl": float(eval_ppl),
+            "normalised_loss": float(eval_norm_loss),
+            "normalised_ppl": float(eval_norm_ppl),
+            **{f"top-{k}": float(v) for k, v in eval_topk_accs.items()},
+        },
+        "full_eval_data": {k : v.cpu().numpy() for k, v in full_eval_data.items()},
+    }
+
 
 def main():
     """Load relevant args and evaluate on some data split."""
@@ -204,10 +217,29 @@ def main():
     config.last_n = args.last_n if args.last_n > 0 else config.seq_len
     config.device = device
 
-    run(config, dedup_type=args.eval_dedup_type)
+    results = run(config, dedup_type=args.eval_dedup_type)
 
-    # TODO save results in wandb
-    # TODO when saving, make sure to mark the dedup_type
+    # name the results
+    results_identifier = f"{args.eval_data_split}_{args.last_n}"
+    if config.dedup_type:
+        results_identifier += f"_{config.dedup_type}"
+    if args.eval_dedup_type:
+        results_identifier += f"_{args.eval_dedup_type}"
+
+    if args.wandb_run:
+        print("Uploading results to wandb ...")
+        # update the run's summary metrics
+        experiment_utils.log_wandb_summary_metrics(
+            args.wandb_run,
+            {f"{results_identifier}/{k}": v for k, v in results["metrics"].items()}
+        )
+        # upload the full eval data if available
+        experiment_utils.upload_arrays_to_wandb(
+            args.wandb_run,
+            {f"{results_identifier}/{k}": v for k, v in results["full_eval_data"].items()}
+        )
+
+    print("Done.")
 
 
 if __name__ == "__main__":
