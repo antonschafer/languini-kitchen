@@ -59,8 +59,12 @@ def load_config(name=None):
         data_root = "data/books",
         relative_log_path = "logs",         # Relative path to the log folder within the project folder languini-kitchen/projects/gpt/logs/
         dataset = "books_16384",
-        vocab_size = 16384,
+        vocab_size = None,                  # to be set when initializing vocab mapping
         debug = False,                      # simply adds a "_debug" suffix so logs are easily distinguishable
+
+        # (de)dup config
+        frac_duplicated = 0.0,              # fraction of duplicated sequences in the dataset
+        dedup_type = "",                    # type of deduplication to apply to the vocabulary ("whitespace", "lower", "plural", "all") or ""/None for none
 
         # optimiser
         seed = 0,

@@ -42,10 +42,11 @@ from languini.common_lib import parallel_utils
 from languini.common_lib import experiment_utils
 from languini.common_lib.parallel_utils import mprint
 from languini.common_lib.parallel_utils import LOCAL_RANK, WORLD_RANK, WORLD_SIZE
+from languini.de_duplication.mappings import configure_dedup_mapping
 
 from model import Model
 
-def run(config):
+def run(config, dedup_type):
     c = config
     mprint(f"WORLD_SIZE: {WORLD_SIZE}")  # total number of devices
     mprint(f"WORLD_RANK: {WORLD_RANK}")  # unique id within all devices
@@ -64,6 +65,24 @@ def run(config):
 
     # load tokeniser
     sp = train_utils.load_tokeniser(config=c)
+
+    # set dedup mapping
+    vocab_mapping = configure_dedup_mapping(
+        sp=sp,
+        frac_duplicated=c.frac_duplicated,
+        dedup_type=c.dedup_type,
+    )
+    mprint(f"Using (de)duplication mapping for input data {vocab_mapping} (same as in training)")
+    if dedup_type:
+        assert (not c.dedup_type) and (c.frac_duplicated == 0), "Can only evaluate with different deduplication mapping if model was trained in vanilla setting"
+        eval_vocab_mapping = configure_dedup_mapping(
+            sp=sp,
+            frac_duplicated=0,
+            dedup_type=dedup_type,
+        )
+    else:
+        eval_vocab_mapping = vocab_mapping
+    mprint(f"Setting deduplication mapping to {eval_vocab_mapping} for evaluation.")
 
     # eval
     c.eval_batch_size = 1
@@ -91,6 +110,7 @@ def run(config):
         device=c.device,
         end_of_doc_token=END_OF_DOC_TOKEN,
         shift_n=c.last_n,
+        vocab_mapping=vocab_mapping,
     )
 
     mprint("Measure test data size ...")
@@ -99,7 +119,8 @@ def run(config):
                                                                         last_n=c.last_n,
                                                                         sp=sp,
                                                                         logger=None,
-                                                                        device=c.device)
+                                                                        device=c.device,
+                                                                        vocab_mapping=eval_vocab_mapping)
     mprint(f"number of bytes: {eval_bytes:,}")
     mprint(f"number of batches: {batch_count:,}")
     mprint(f"number of tokens: {token_count:,}")
@@ -116,7 +137,8 @@ def run(config):
                                                                                     data_source=ds,
                                                                                     max_steps=batch_count,
                                                                                     last_n=c.last_n,
-                                                                                    print_progress=True)
+                                                                                    print_progress=True,
+                                                                                    vocab_mapping=eval_vocab_mapping)
     # loss and ppl over number of tokens
     eval_avg_loss = eval_total_loss / eval_token_count
     eval_ppl = math.exp(eval_avg_loss)
@@ -159,6 +181,7 @@ def main():
     parser.add_argument("--wandb_run", default="", type=str, help=f"Wandb run to load model config and checkpoint from.")
     parser.add_argument("--eval_data_split", default="test", type=str, help=f"Name of the languini books split to do eval on.")
     parser.add_argument("--last_n", default=-1, type=int, help=f"Last n tokens to evaluate in the sequence.")
+    parser.add_argument("--eval_dedup_type", default="", type=str, help=f"Deduplication to apply before computing eval metrics. Only valid for models trained with out (de)duplication (i.e., identity vocab mapping)")
     args = parser.parse_args(sys.argv[1:])
 
     # download file from wandb if necessary
@@ -180,7 +203,10 @@ def main():
     config.last_n = args.last_n if args.last_n > 0 else config.seq_len
     config.device = device
 
-    run(config)
+    run(config, dedup_type=args.eval_dedup_type)
+
+    # TODO save results in wandb
+    # TODO when saving, make sure to mark the dedup_type
 
 
 if __name__ == "__main__":

@@ -49,7 +49,7 @@ DEFAULT_CONFIG = {
 }
 
 
-def evaluation(config, model, state, data_source, max_steps, last_n=-1, print_progress=False):
+def evaluation(config, model, state, data_source, max_steps, vocab_mapping, last_n=-1, print_progress=False):
     """
     Evaluates the model on a datasource without gradient updates or extra logs besides loss.
     
@@ -59,6 +59,7 @@ def evaluation(config, model, state, data_source, max_steps, last_n=-1, print_pr
         state: the latest state of the model if it has one (or None to initialise a new one).
         data_source: the source for the input and target batches.
         max_step (int): number of batches do process for evaluation.
+        vocab_mapping (VocabMapping): mapping to use for deduplicating labels and logits
         last_n (int): evaluate loss on the last_n targets. If last_n is -1 it will evaluate on all targets.
         print_progress (bool): simple terminal log for eval.py to display progress.
     """
@@ -109,18 +110,22 @@ def evaluation(config, model, state, data_source, max_steps, last_n=-1, print_pr
                 logits, state = model(batch_x, state, log=None)
                 check(logits, (bsz, seqlen, c.vocab_size))
 
+                # deduplicate
+                del batch_x # avoid accidental use
+                batch_y = vocab_mapping.deduplicate_labels(batch_y)
+                logits = vocab_mapping.deduplicate_logits(logits)
+                check(logits, (bsz, seqlen, vocab_mapping.dedup_vocab_size))
+
                 # If last_n is positive we only care about the last_n losses and targets.
                 if last_n == -1:
                     last_n = seqlen
-                batch_x = batch_x[:, -last_n:]
-                check(batch_x, (bsz, last_n))
                 logits = logits[:, -last_n:, :]
-                check(logits, (bsz, last_n, c.vocab_size))
+                check(logits, (bsz, last_n, vocab_mapping.dedup_vocab_size))
                 batch_y = batch_y[:, -last_n:]
                 check(batch_y, (bsz, last_n))
                 
                 # compute loss
-                logits = logits.reshape(bsz * last_n, c.vocab_size)
+                logits = logits.reshape(bsz * last_n, vocab_mapping.dedup_vocab_size)
                 batch_y = batch_y.reshape(bsz * last_n)
                 all_losses = F.cross_entropy(input=logits, target=batch_y, reduction='none')
                 check(all_losses, (bsz * last_n,))
@@ -149,7 +154,7 @@ def evaluation(config, model, state, data_source, max_steps, last_n=-1, print_pr
     return total_loss.item(), total_top_k_counts, total_token_count.item(), state
 
 
-def log_eval_stats(eval_data_source, eval_steps, last_n, sp, logger, device):
+def log_eval_stats(eval_data_source, eval_steps, last_n, sp, logger, device, vocab_mapping):
     """Counts the number of eval batches and the length in string bytes. Saves these values for later."""
     eval_data_source.reset()
     eval_batches = eval_data_source if eval_steps == -1 else itertools.islice(eval_data_source, eval_steps)
@@ -166,8 +171,11 @@ def log_eval_stats(eval_data_source, eval_steps, last_n, sp, logger, device):
         check(batch_x, (micro_batches, local_micro_bsz, seqlen))
         check(batch_y, (micro_batches, local_micro_bsz, seqlen))
 
-        batch_x = batch_x[:, :, -last_n:]
         batch_y = batch_y[:, :, -last_n:]
+
+        # deduplicate
+        del batch_x # avoid accidental use
+        batch_y = vocab_mapping.deduplicate_labels(batch_y)
 
         # decode targets and measure length
         batch_y = torch.reshape(batch_y, (batch_y.shape[0] * batch_y.shape[1], -1))
@@ -204,7 +212,7 @@ def log_eval_stats(eval_data_source, eval_steps, last_n, sp, logger, device):
 class LMTrainer:
     """A language modelling trainer. """
     
-    def __init__(self, config, logger, model, opt, train_batches, eval_batches, scheduler=None):
+    def __init__(self, config, logger, model, opt, train_batches, eval_batches, vocab_mapping, scheduler=None):
         train_utils.check_config(config, DEFAULT_CONFIG)
         self.c = c = config
         self.logger = logger
@@ -214,6 +222,7 @@ class LMTrainer:
         self.train_batches = train_batches
         self.eval_batches = eval_batches
         self.scaler = torch.cuda.amp.GradScaler(enabled=c.device.type == "cuda")
+        self.vocab_mapping = vocab_mapping
 
         # log hyperparameters
         train_utils.log_hyperparams(config, self.logger)
@@ -228,7 +237,7 @@ class LMTrainer:
 
         # load tokeniser
         self.sp = train_utils.load_tokeniser(config=c)
-        assert self.c.vocab_size == self.sp.vocab_size(), f"config vocab size {c.vocab_size} doesn't match tokeniser vocab size {self.sp.vocab_size()}"
+        assert vocab_mapping.input_vocab_size == self.sp.vocab_size(), f"mapping input vocab size {vocab_mapping.input_vocab_size} doesn't match tokeniser vocab size {self.sp.vocab_size()}"
 
         # get number of eval steps and total eval bytes since that will be the same for every evaluation run
         parallel_utils.mprint("Measure evaluation data size ...")
@@ -237,6 +246,7 @@ class LMTrainer:
                                                sp=self.sp,
                                                logger=self.logger,
                                                device=self.c.device,
+                                               vocab_mapping=self.vocab_mapping,
                                                last_n=self.c.seq_len)
 
     def train(self):
@@ -453,6 +463,7 @@ class LMTrainer:
                                                                            model=self.model,
                                                                            state=eval_state,
                                                                            data_source=self.eval_batches,
+                                                                           vocab_mapping=self.vocab_mapping,
                                                                            max_steps=c.max_eval_steps)
         # loss and ppl over number of tokens
         eval_avg_loss = eval_total_loss / eval_token_count
