@@ -291,6 +291,10 @@ class LanguiniDatasetIterator:
         seq = torch.reshape(seq, (self.micro_batches, self.bsz // self.micro_batches, self.seq_len + 1))
         seq = seq.to(self.device, non_blocking=True)
 
+        # mark words as non-canonical
+        batch_x_unmapped = seq[:, :, :-1]
+        x_is_noncanonical = [self.vocab_mapping.is_noncanonical(bxu) for bxu in batch_x_unmapped]
+
         # remap token ids
         seq = self.vocab_mapping(seq)
 
@@ -298,4 +302,4 @@ class LanguiniDatasetIterator:
         batch_x = seq[:, :, :-1]
         batch_y = seq[:, :, 1:]
 
-        return batch_x, batch_y, is_padded
+        return batch_x, batch_y, is_padded, x_is_noncanonical

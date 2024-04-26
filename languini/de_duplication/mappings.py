@@ -63,6 +63,13 @@ class VocabMapping(ABC):
         """
         pass
 
+    def is_noncanonical(self, *args, **kwargs):
+        """
+        Returns dictionary
+            dedup_type -> boolean tensor indicating whether the tokens are non-canonical under this dedup_typ
+        """
+        return None # not defined for all mappings
+
 
 class IdentityMapping(VocabMapping):
     """
@@ -193,8 +200,16 @@ class DeduplicationMapping(VocabMapping):
         self.mapping = torch.tensor([canonical_to_id[sw_canonical] for sw_canonical in all_subwords_canonical])
 
         # track other properties
-        self._is_noncanonical = torch.tensor([sw != sw_canonical for sw, sw_canonical in zip(all_subwords, all_subwords_canonical)])
-        self._is_remapped = self.mapping != torch.arange(self.original_vocab_size)
+        if dedup_type != "all":
+            self._is_noncanonical = {dedup_type: torch.tensor([sw != sw_canonical for sw, sw_canonical in zip(all_subwords, all_subwords_canonical)])}
+            self._is_remapped = {dedup_type: self.mapping != torch.arange(self.original_vocab_size)}
+        else:
+            self._is_noncanonical, self._is_remapped = {}, {}
+            for dt in DEDUP_TRANSFORMS:
+                if dt == "all": continue
+                dedup_mapping = DeduplicationMapping(sp, dt)
+                self._is_noncanonical[dt] = dedup_mapping._is_noncanonical[dt]
+                self._is_remapped[dt] = dedup_mapping._is_remapped[dt]
     
     def __call__(self, x):
         self.mapping = self.mapping.to(x.device)
@@ -216,7 +231,8 @@ class DeduplicationMapping(VocabMapping):
     
     def is_noncanonical(self, x, definition="remapped"):
         """
-        Returns a boolean tensor indicating whether the tokens are is non-canonical according to the definition
+        Returns dictionary
+            dedup_type -> boolean tensor indicating whether the tokens are non-canonical under this dedup_type
 
         Args:
             x: token ids
@@ -224,12 +240,10 @@ class DeduplicationMapping(VocabMapping):
                 "remapped": tokens that are actually remapped
                 "noncanonical": tokens that are remapped and that would be remapped if their canonical form was in the vocab
         """
-        if definition == "remapped":
-            self._is_remapped = self._is_remapped.to(x.device)
-            return self._is_remapped[x]
-        elif definition == "noncanonical":
-            self._is_noncanonical = self._is_noncanonical.to(x.device)
-            return self._is_noncanonical[x]
+        masks = self._is_remapped if definition == "remapped" else self._is_noncanonical
+        for dt in masks:
+            masks[dt] = masks[dt].to(x.device)
+        return {dt: mask[x] for dt, mask in masks.items()}
 
     def deduplicate_logits(self, logits):
         # compute manual logsumexp for logits
@@ -281,7 +295,7 @@ class HalfDeduplicationMapping(DeduplicationMapping):
         self._is_remapped = None
 
     def is_noncanonical(self, *args, **kwargs):
-        raise NotImplementedError("HalfDeduplicationMapping does not support is_noncanonical")
+        return None # not supported for half deduplication
     
     def __str__(self):
         return f"halfdeduplication_{self.original_vocab_size}_[{self.dedup_type}]_{self.seed}"

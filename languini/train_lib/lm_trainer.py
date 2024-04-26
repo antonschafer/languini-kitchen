@@ -103,7 +103,7 @@ def evaluation(config, model, state, data_source, max_steps, vocab_mapping, last
                 eval_batches = tqdm(eval_batches, total=None if max_steps == -1 else max_steps)
 
             # iterate over batches
-            for batch_count, (batch_x, batch_y, is_padded) in enumerate(eval_batches, start=1):
+            for batch_count, (batch_x, batch_y, is_padded, x_is_noncanonical) in enumerate(eval_batches, start=1):
                 if print_progress and batch_count % 1_000 == 0:
                     parallel_utils.mprint(f"{batch_count:d}")
                 
@@ -112,6 +112,7 @@ def evaluation(config, model, state, data_source, max_steps, vocab_mapping, last
 
                 # Remove the microbatch dimension
                 batch_x, batch_y = batch_x.squeeze(0), batch_y.squeeze(0)
+                x_is_noncanonical = x_is_noncanonical[0]
                 bsz, seqlen = batch_x.shape
 
                 if track_full_data:
@@ -122,7 +123,7 @@ def evaluation(config, model, state, data_source, max_steps, vocab_mapping, last
 
                 
                 # run the forward pass
-                logits, state = model(batch_x, state, log=None)
+                logits, state = model(batch_x, state, x_is_noncanonical=x_is_noncanonical, log=None)
                 check(logits, (bsz, seqlen, c.vocab_size))
 
                 # deduplicate
@@ -194,7 +195,7 @@ def log_eval_stats(eval_data_source, eval_steps, last_n, sp, logger, device, voc
     # use tensors to count in case it is distributed across accelerators
     token_count = torch.zeros(1, device=device)
     str_length = torch.zeros(1, device=device)
-    for batch_count, (batch_x, batch_y, is_padded) in enumerate(eval_batches, start=1):
+    for batch_count, (batch_x, batch_y, is_padded, _) in enumerate(eval_batches, start=1):
         check(batch_x, (micro_batches, local_micro_bsz, seqlen))
         check(batch_y, (micro_batches, local_micro_bsz, seqlen))
 
@@ -307,7 +308,7 @@ class LMTrainer:
             avg_loss = torch.tensor(0.0, device=c.device)
 
             load_watch.start()
-            total_batch_x, total_batch_y, _ = next(self.train_batches)
+            total_batch_x, total_batch_y, _, total_x_is_noncanonical = next(self.train_batches)
             check(total_batch_x, (c.gradient_accumulation_steps, c.train_batch_size // c.gradient_accumulation_steps // c.n_workers, c.seq_len))
             load_watch.pause().count()
 
@@ -320,6 +321,7 @@ class LMTrainer:
                 # select the current micro batch
                 batch_x = total_batch_x[micro_step]
                 batch_y = total_batch_y[micro_step]
+                x_is_noncanonical = total_x_is_noncanonical[micro_step]
                 check(batch_x, (c.train_batch_size // c.gradient_accumulation_steps // c.n_workers, c.seq_len))
                 bsz, seqlen = batch_x.shape
 
@@ -337,10 +339,10 @@ class LMTrainer:
                     
                     # perform the model forward pass with or without activation logs
                     if do_activations_log:
-                        logits, curr_state = self.model(batch_x, curr_state, log=(self.logger, step))
+                        logits, curr_state = self.model(batch_x, curr_state, x_is_noncanonical=x_is_noncanonical, log=(self.logger, step))
                     else:
                         forward_watch.start()
-                        logits, curr_state = self.model(batch_x, curr_state, log=None)
+                        logits, curr_state = self.model(batch_x, curr_state, x_is_noncanonical=x_is_noncanonical, log=None)
                         forward_watch.pause().count()                    
                     check(logits, (bsz, c.seq_len, c.vocab_size))
 
