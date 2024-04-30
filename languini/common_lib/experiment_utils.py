@@ -190,7 +190,6 @@ def load_wandb_files(run_path, exclude=None, include=None, cache_dir=None):
     return run_dir 
 
 
-
 def load_wandb_file(run_path, fname, cache_dir=None):
     run_dir = load_wandb_files(run_path, include=[fname], cache_dir=cache_dir)
     local_fname = os.path.join(run_dir, fname)
