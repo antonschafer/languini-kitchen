@@ -107,7 +107,7 @@ class DuplicationMapping(VocabMapping):
     """
     Duplicates the vocabulary, maps tokens to their duplicates with probability 0.5
     """
-    def __init__(self, original_vocab_size, frac_duplicated, seed):
+    def __init__(self, original_vocab_size, frac_duplicated, p_duplicate, seed):
         self.original_vocab_size = original_vocab_size
         
         # randomly select a fraction of subword ids that are duplicated
@@ -120,7 +120,7 @@ class DuplicationMapping(VocabMapping):
 
         self.n_duplicated = n_duplicated
         self.is_duplicated = is_duplicated
-        self.p_duplicate = 0.5
+        self.p_duplicate = p_duplicate
         self.seed = seed
     
     def __call__(self, x):
@@ -304,6 +304,7 @@ class HalfDeduplicationMapping(DeduplicationMapping):
 def configure_dedup_mapping(
         sp,
         frac_duplicated,
+        p_duplicate,
         dedup_type,
         seed=0,
     ):
@@ -313,14 +314,21 @@ def configure_dedup_mapping(
     Args:
         sp: the sentencepiece tokeniser
         frac_duplicated: fraction of vocabulary to duplicate
+        p_duplicate: probability of duplicating a token (only used for duplication)
         dedup_type: type of deduplication to apply ("whitespace", "lower", "plural", "all"), or ""/None for none
         verbose: whether to print the mapping
     """
     assert not (frac_duplicated > 0 and dedup_type), "Cannot have both duplication and deduplication"
 
     if frac_duplicated > 0:
-        mapping = DuplicationMapping(sp.vocab_size(), frac_duplicated, seed)
+        mapping = DuplicationMapping(
+            sp.vocab_size(),
+            frac_duplicated=frac_duplicated,
+            p_duplicate=p_duplicate,
+            seed=seed
+        )
     elif dedup_type:
+        assert p_duplicate is None
         if dedup_type.endswith("_50%"):
             dedup_type = dedup_type[:-4]
             mapping = HalfDeduplicationMapping(sp, dedup_type)

@@ -170,6 +170,7 @@ def main():
     vocab_mapping = configure_dedup_mapping(
         sp=train_utils.load_tokeniser(config),
         frac_duplicated=config.frac_duplicated,
+        p_duplicate=config.p_duplicate,
         dedup_type=config.dedup_type,
     )
     config.vocab_size = vocab_mapping.output_vocab_size

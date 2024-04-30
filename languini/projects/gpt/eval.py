@@ -70,6 +70,7 @@ def run(config, dedup_type):
     vocab_mapping = configure_dedup_mapping(
         sp=sp,
         frac_duplicated=c.frac_duplicated,
+        p_duplicate=config.p_duplicate,
         dedup_type=c.dedup_type,
     )
     mprint(f"Using (de)duplication mapping for input data {vocab_mapping} (same as in training)")
@@ -78,6 +79,7 @@ def run(config, dedup_type):
         eval_vocab_mapping = configure_dedup_mapping(
             sp=sp,
             frac_duplicated=0,
+            p_duplicate=None,
             dedup_type=dedup_type,
         )
     else:
