@@ -146,13 +146,13 @@ def evaluation(config, model, state, data_source, max_steps, vocab_mapping, last
                 all_losses = F.cross_entropy(input=logits, target=batch_y, reduction='none')
                 check(all_losses, (bsz * last_n,))
 
-                if track_full_data:
-                    losses_dataset[idx_ds_start: idx_ds_end, -last_n:] = all_losses
-
                 # mask losses that are padded (unlike training, evaluation can result in batches with padded batches)
                 is_padding = batch_y.reshape(-1) == 0 # (bsz * last_n,)
                 all_losses = all_losses.masked_fill(is_padding, 0.0)
                 token_count = torch.sum(~is_padding)
+
+                if track_full_data:
+                    losses_dataset[idx_ds_start: idx_ds_end, -last_n:] = all_losses
 
                 # compute accuracy for top-1 and top-10
                 topk_counts = train_utils.total_correct(logits, batch_y, is_padding=is_padding, topk=(1, 10))
