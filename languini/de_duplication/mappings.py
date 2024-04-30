@@ -125,6 +125,7 @@ class DuplicationMapping(VocabMapping):
     
     def __call__(self, x):
         do_duplicate = torch.rand_like(x, dtype=torch.float32) < self.p_duplicate
+        self.is_duplicated = self.is_duplicated.to(x.device)
         do_duplicate &= self.is_duplicated[x]
         return torch.where(do_duplicate, x + self.original_vocab_size, x)
     

@@ -233,6 +233,6 @@ def upload_arrays_to_wandb(run_path, arrays):
         for k, v in arrays.items():
             local_path = os.path.join(temp_dir, f"{k}.npy")
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
-            np.save(v, local_path)
+            np.save(local_path, v)
             run.upload_file(local_path, root=temp_dir)
 
