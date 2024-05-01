@@ -82,7 +82,7 @@ def evaluation(config, model, state, data_source, max_steps, vocab_mapping, last
 
     if track_full_data:
         assert dist.get_world_size() == 1, "save_full_data is not supported in distributed mode"
-        EST_MAX_SAMPLES = 50_000 # estimate for maximum number of sequences in the evaluation set, breaks if exceeded
+        EST_MAX_SAMPLES = 100_000 # estimate for maximum number of sequences in the evaluation set, breaks if exceeded
         x_dataset = torch.full((EST_MAX_SAMPLES, c.seq_len), fill_value=float("nan"), device=c.device, dtype=torch.float32)
         y_dataset = torch.full((EST_MAX_SAMPLES, c.seq_len), fill_value=float("nan"), device=c.device, dtype=torch.float32)
         losses_dataset = torch.full((EST_MAX_SAMPLES, c.seq_len), fill_value=float("nan"), device=c.device, dtype=torch.float32)
@@ -118,6 +118,7 @@ def evaluation(config, model, state, data_source, max_steps, vocab_mapping, last
                 if track_full_data:
                     # track data
                     idx_ds_start, idx_ds_end = bsz * (batch_count - 1), bsz * batch_count
+                    assert idx_ds_end <= EST_MAX_SAMPLES, "exceeded maximum number of samples"
                     x_dataset[idx_ds_start: idx_ds_end] = batch_x
                     y_dataset[idx_ds_start: idx_ds_end] = batch_y
 
