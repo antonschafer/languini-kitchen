@@ -67,7 +67,7 @@ def load_config(name=None):
         debug = False,                      # simply adds a "_debug" suffix so logs are easily distinguishable
 
         # (de)dup config
-        frac_duplicated = 0.0,              # fraction of duplicated sequences in the dataset
+        frac_duplicated = 0.0,              # fraction of vocabulary to duplicate
         p_duplicate=None,                   # probability of a token being duplicated 
         dedup_type = "",                    # type of deduplication to apply to the vocabulary ("whitespace", "lower", "plural", "all") or ""/None for none
         embed_noncanonical = False,         # whether to add an extra embedding indicating whether a token is "non-canonical"
