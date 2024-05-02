@@ -43,7 +43,7 @@ def main():
 
     # setup output dir
     if config.output_dir is None:
-        config.output_dir = f"languini/projects/word2vec/results/{config.frac_duplicated}_{config.p_dup}_{config.duplication_seed}"
+        config.output_dir = f"word2vec_results/{config.frac_duplicated}_{config.p_dup}_{config.duplication_seed}"
     os.makedirs(config.output_dir, exist_ok=False)
 
     vocab_mapping = configure_dedup_mapping(
