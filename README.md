@@ -7,7 +7,7 @@ To reproduce the plots from the paper without retraining models, you can load th
 ```
 wget TODOTODO
 ```
-and follow the [analysis notebook](analysis.ipynb).
+then [install languini](./languini-instructions/README.md#install-languini) in your environment and follow the [analysis notebook](analysis.ipynb).
 
 ## Training Models
 
