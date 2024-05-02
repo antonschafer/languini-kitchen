@@ -1,4 +1,4 @@
-# [On the Effect of (Near) Duplicate Subwords in Language Modelling](https://arxiv.org/abs/2404.06508)
+# On the Effect of (Near) Duplicate Subwords in Language Modelling
 
 Code to the paper [On the Effect of (Near) Duplicate Subwords in Language Modelling](https://arxiv.org/abs/2404.06508). The code is based on the [Languini Kitchen](https://github.com/languini-kitchen/languini-kitchen), a codebase for training language models. For an overview of the changes made to support vocabulary (de)duplication, see [this diff]() or check out the [(de)duplication implementation](./languini/de_duplication/mappings.py). TODOTODO
 
@@ -20,7 +20,7 @@ You can also train models under the (de)duplicated settings of the paper:
     - `dedup_type`: type of deduplication to apply to vocabulary ("whitespace", "lower", "plural", "all") or ""/None for no deduplication. Use the suffix "_50%" to only deduplicate half of the respective near duplicates.
     - `embed_noncanonical`: whether to add an extra embedding indicating whether a token is "non-canonical"
     
-    For example, to train a model that coresponds to the $\hat{p}(c) + e_\text{non-canonical} $ with  $\mathbb{S}_\text{all}$ entry in Table 5, run
+    For example, to train a model that coresponds to the $p(c) + e_\text{non-canonical}$ with  $\mathbb{S}_\text{all}$ entry in Table 5, run
     ```
     TRAIN_STEPS=18265
     ACC_STEPS=8 # this works for a 4090 (24 GB)
