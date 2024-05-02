@@ -46,7 +46,7 @@ from languini.de_duplication.mappings import configure_dedup_mapping
 
 from model import Model
 
-def run(config, dedup_type):
+def run(config, eval_dedup_type):
     c = config
     mprint(f"WORLD_SIZE: {WORLD_SIZE}")  # total number of devices
     mprint(f"WORLD_RANK: {WORLD_RANK}")  # unique id within all devices
@@ -67,24 +67,28 @@ def run(config, dedup_type):
     sp = train_utils.load_tokeniser(config=c)
 
     # set dedup mapping
-    vocab_mapping = configure_dedup_mapping(
+    train_vocab_mapping = configure_dedup_mapping(
         sp=sp,
         frac_duplicated=c.frac_duplicated,
         p_duplicate=config.p_duplicate,
         dedup_type=c.dedup_type,
     )
-    mprint(f"Using (de)duplication mapping for input data {vocab_mapping} (same as in training)")
-    if dedup_type:
-        assert (not c.dedup_type) and (c.frac_duplicated == 0), "Can only evaluate with different deduplication mapping if model was trained in vanilla setting"
-        eval_vocab_mapping = configure_dedup_mapping(
-            sp=sp,
-            frac_duplicated=0,
-            p_duplicate=None,
-            dedup_type=dedup_type,
-        )
+    if eval_dedup_type:
+        if c.dedup_type and not c.dedup_type.startswith(eval_dedup_type):
+            raise ValueError(f"Model trained with {c.dedup_type=}, cannot evaluate with {eval_dedup_type=}")
+        if c.frac_duplicated > 0:
+            raise NotImplementedError(f"Model trained with {c.frac_duplicated=} > 0, cannot evaluate with deduplication ({eval_dedup_type=})")
     else:
-        eval_vocab_mapping = vocab_mapping
-    mprint(f"Setting deduplication mapping to {eval_vocab_mapping} for evaluation.")
+        if c.dedup_type:
+            raise ValueError(f"Model trained with {c.dedup_type=}, cannot evaluate without deduplication")
+    eval_vocab_mapping = configure_dedup_mapping(
+        sp=sp,
+        frac_duplicated=0,
+        p_duplicate=None,
+        dedup_type=eval_dedup_type,
+    )
+    mprint(f"Using  '{train_vocab_mapping}' (de)duplication mapping for input data (same as in training)")
+    mprint(f"Setting deduplication mapping to '{eval_vocab_mapping}' for evaluation.")
 
     # eval
     c.eval_batch_size = 1
@@ -112,7 +116,7 @@ def run(config, dedup_type):
         device=c.device,
         end_of_doc_token=END_OF_DOC_TOKEN,
         shift_n=c.last_n,
-        vocab_mapping=vocab_mapping,
+        vocab_mapping=train_vocab_mapping,
     )
 
     mprint("Measure test data size ...")
@@ -197,7 +201,7 @@ def main():
     parser.add_argument("--wandb_run", default="", type=str, help=f"Wandb run to load model config and checkpoint from.")
     parser.add_argument("--eval_data_split", default="test", type=str, help=f"Name of the languini books split to do eval on.")
     parser.add_argument("--last_n", default=-1, type=int, help=f"Last n tokens to evaluate in the sequence.")
-    parser.add_argument("--eval_dedup_type", default="", type=str, help=f"Deduplication to apply before computing eval metrics. Only valid for models trained with out (de)duplication (i.e., identity vocab mapping)")
+    parser.add_argument("--eval_dedup_type", default="", type=str, help=f"Deduplication to apply before computing eval metrics.")
     args = parser.parse_args(sys.argv[1:])
 
     # download file from wandb if necessary
@@ -219,13 +223,12 @@ def main():
     config.last_n = args.last_n if args.last_n > 0 else config.seq_len
     config.device = device
 
-    results = run(config, dedup_type=args.eval_dedup_type)
+    results = run(config, eval_dedup_type=args.eval_dedup_type)
 
     # name the results
     results_identifier = f"{args.eval_data_split}_{args.last_n}"
-    if config.dedup_type:
-        results_identifier += f"_{config.dedup_type}"
     if args.eval_dedup_type:
+        # specified dedup type overrides the one in the config (used during training)
         results_identifier += f"_{args.eval_dedup_type}"
 
     if args.wandb_run:
