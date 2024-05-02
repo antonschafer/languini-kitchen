@@ -8,13 +8,20 @@ To reproduce the plots from the paper without retraining models, you can load th
 wget https://github.com/antonschafer/duplicate-subwords-data/raw/main/results.zip
 unzip results.zip
 ```
-then [install languini](./languini-instructions/README.md#install-languini) in your environment and follow the [analysis notebook](analysis.ipynb).
+then install languini in a new environment
+```
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip setuptools
+pip install -e . --upgrade
+```
+and run the [analysis notebook](analysis.ipynb).
 
 ## Training Models
 
 You can also train models under the (de)duplicated settings of the paper:
 
-1. Follow the instructions from the [Languini README](./languini-instructions/README.md) for installation and obtaining the dataset.
+1. Setup the environment as described above and follow the [instructions for obtaining the dataset](#download-and-tokenise-the-books3-dataset).
 2. Train models as described in Languini. Configure duplication settings via the config arguments
     - `frac_duplicated`: fraction of the vocabulary to duplicate
     - `p_duplicate`: probability of a token being a duplicated token (given that the corresponding vocabulary item is duplicated)
