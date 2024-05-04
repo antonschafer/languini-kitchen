@@ -7,6 +7,38 @@ from languini.common_lib.parallel_utils import mprint
 from languini.dataset_lib.languini_books import LanguiniDatasetIterator
 
 
+class LanguageScheduler:
+    """
+    Changes p_clone/p_l2 over time according to a schedule of evenly spaced steps.
+    """
+    def __init__(self, schedule, n_total_steps, datasets, attr_name):
+        assert len(schedule) > 1
+        self.n_total_steps = n_total_steps
+        self.schedule = [float(x) for x in schedule.split("_")]
+        self.attr_name = attr_name
+        self.datasets = datasets
+        self.curr_step = 0
+        self.idx = 0
+        self.episode_length = n_total_steps // len(self.schedule)
+
+        # check that first value matches
+        for ds in datasets:
+            if getattr(ds, attr_name) != self.schedule[0]:
+                raise ValueError(f"Initial value of {attr_name} does not match schedule.")
+    
+    def step(self):
+        """
+        To be called at the end of each training step.
+        """
+        assert self.curr_step < self.n_total_steps
+        self.curr_step += 1
+        if self.curr_step % self.episode_length == 0 and self.idx < len(self.schedule) - 1:
+            self.idx += 1
+            for ds in self.datasets:
+                setattr(ds, self.attr_name, self.schedule[self.idx])
+            mprint(f"language scheduler -- switched to {self.schedule[self.idx]} for {self.attr_name} after {self.curr_step} steps.")
+
+
 class ClonedLanguageDataset(LanguiniDatasetIterator):
     def __init__(self, *, num_languages, p_clone, frac_clone, sp, **kwargs):
         """

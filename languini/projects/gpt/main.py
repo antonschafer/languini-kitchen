@@ -127,6 +127,19 @@ def run(config, logger):
     assert train_ds.vocab_size == eval_ds.vocab_size
     c.vocab_size = train_ds.vocab_size
 
+    ## Setup language schedule
+    if c.language_schedule:
+        mprint("Using language schedule ...")
+        assert c.num_cloned_languages > 0 or c.data_root_2 is not None
+        language_scheduler = multilingual.LanguageScheduler(
+            c.language_schedule,
+            n_total_steps=c.max_train_steps,
+            datasets=[train_ds, eval_ds],
+            attr_name="p_l2" if c.data_root_2 is not None else "p_clone",
+        )
+    else:
+        language_scheduler = None
+
     ## Setup Model
     mprint("Build model ... ")
     if WORLD_SIZE > 1:
@@ -155,7 +168,8 @@ def run(config, logger):
                                    opt=opt,
                                    scheduler=scheduler,
                                    train_batches=train_ds,
-                                   eval_batches=eval_ds)
+                                   eval_batches=eval_ds,
+                                   language_scheduler=language_scheduler)
 
     mprint("Begin training ... ")
     trainer.train()

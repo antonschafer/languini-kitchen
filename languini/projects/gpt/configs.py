@@ -73,6 +73,9 @@ def load_config(name=None):
         p_l2 = None,                         # probability of sampling from the second language/dataset
         merge_vocab = False,                 # whether to merge the vocabularies of the two languages/tokenizers
 
+        # scheduler of language ratio
+        language_schedule = None,            # e.g. 0.1_0.9_0.5_0.5 for 4 stages of 10%, 90%, 50%, 50% p_l2/p_clone respectively
+
         # optimiser
         seed = 0,
         gradient_accumulation_steps = 1,    # number of batches before doing a gradient step

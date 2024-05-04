@@ -202,13 +202,14 @@ def log_eval_stats(eval_data_source, eval_steps, last_n, logger, device):
 class LMTrainer:
     """A language modelling trainer. """
     
-    def __init__(self, config, logger, model, opt, train_batches, eval_batches, scheduler=None):
+    def __init__(self, config, logger, model, opt, train_batches, eval_batches, scheduler=None, language_scheduler=None):
         train_utils.check_config(config, DEFAULT_CONFIG)
         self.c = c = config
         self.logger = logger
         self.model = model.to(config.device)
         self.opt = opt
         self.scheduler = scheduler
+        self.language_scheduler = language_scheduler
         self.train_batches = train_batches
         self.eval_batches = eval_batches
         self.scaler = torch.cuda.amp.GradScaler(enabled=c.device.type == "cuda")
@@ -367,6 +368,8 @@ class LMTrainer:
             # learning rate schedule has to step too
             if self.scheduler:
                 self.scheduler.step()
+            if self.language_scheduler:
+                self.language_scheduler.step()
 
             tokens_seen += c.train_batch_size * c.seq_len
             
