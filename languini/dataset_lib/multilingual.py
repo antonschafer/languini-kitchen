@@ -3,6 +3,7 @@
 
 import random
 import torch
+from languini.common_lib.parallel_utils import mprint
 from languini.dataset_lib.languini_books import LanguiniDatasetIterator
 
 
@@ -28,22 +29,21 @@ class ClonedLanguageDataset(LanguiniDatasetIterator):
         # randomly select a fraction of subword ids that are cloned
         clone_seed = 0
         self.n_cloned = int(frac_clone * self.original_vocab_size)
-        self.is_cloned = torch.zeros(self.original_vocab_size, dtype=torch.bool)
+        self.is_cloned = torch.zeros(self.original_vocab_size, dtype=torch.bool, device=self.device)
         all_ids = list(range(self.original_vocab_size))
         random.Random(clone_seed).shuffle(all_ids)
         for i in all_ids[:self.n_cloned]:
             self.is_cloned[i] = True
 
     def __next__(self):
-        batch_x, batch_y, is_padded = self.ds.__next__(raw_seq=True)
+        batch_x, batch_y, is_padded = super().__next__()
 
-        device = batch_x.device
         micro_batches, micro_bsz, seqlen = batch_x.shape
         bsz = micro_batches * micro_bsz
 
         # sample which cloned language to use for each sample
-        cloned_lang = torch.randint(1, self.num_languages, (bsz, 1), device=device)
-        do_clone = torch.rand(bsz, 1, dtype=torch.float, device=device) < self.p_l2
+        cloned_lang = torch.randint(1, self.num_languages, (bsz, 1), device=self.device)
+        do_clone = torch.rand(bsz, 1, dtype=torch.float, device=self.device) < self.p_l2
         lang = torch.where(do_clone, cloned_lang, 0)
         # lang i has ids [i * size, (i+1) * size)
         lang_offset = lang * self.original_vocab_size
@@ -74,10 +74,11 @@ class BilingualDataset:
             split_1,
             data_path_2,
             split_2,
-            sp_1,
-            sp_2,
+            sp1,
+            sp2,
             merge_vocab,
             p_l2,
+            verbose=False,
             **kwargs
         ):
         """
@@ -93,29 +94,120 @@ class BilingualDataset:
             sp_2: SentencePiece tokenizer for the second language.
             merge_vocab (bool): whether to merge the vocabularies.
             p_l2 (float): probability of using the second language for a sample.
+            verbose (bool): whether to print information about the merged vocabularies.
         """
+        self.device = kwargs["device"]
+        self.seq_len = kwargs["seq_len"]
+        self.batch_idxs = kwargs["batch_idxs"]
+        self.micro_batches = kwargs["micro_batches"]
+        self.bsz = kwargs["bsz"]
+        kwargs["device"] = "cpu" # avoid cluttering the GPU as we have to buffer data
         self.ds1 = LanguiniDatasetIterator(data_path=data_path_1, split=split_1, **kwargs)
         self.ds2 = LanguiniDatasetIterator(data_path=data_path_2, split=split_2, **kwargs)
-        self.sp_1 = sp_1
-        self.sp_2 = sp_2
+        self.sp1 = sp1
+        self.sp2 = sp2
         self.merge_vocab = merge_vocab
         self.p_l2 = p_l2
+        self.lang_seed = 0
 
-        # TODO setup vocabularies
-    
-    def reset(self):
-        self.ds1.reset()
-        self.ds2.reset()
+        if sp1.vocab_size() != sp2.vocab_size():
+            raise NotImplementedError("Vocabularies must have the same size.")
+        self.original_vocab_size = sp1.vocab_size()
+
+        # create the combined vocabulary
+        if merge_vocab:
+            self.sp2_id_to_combined_id = torch.full((self.original_vocab_size,), -1, dtype=torch.long)
+            sp1_piece_to_id = {self.sp1.id_to_piece(i): i for i in range(self.original_vocab_size)}
+            n_added = 0
+            for i in range(self.original_vocab_size):
+                piece = self.sp2.id_to_piece(i)
+                if piece in sp1_piece_to_id:
+                    # piece exists in both vocabularies, merge
+                    self.sp2_id_to_combined_id[i] = sp1_piece_to_id[piece]
+                else:
+                    # create a new id
+                    combined_id = self.original_vocab_size + n_added
+                    n_added += 1
+                    self.sp2_id_to_combined_id[i] = combined_id
+            self.combined_vocab_size = self.original_vocab_size + n_added
+        else:
+            self.combined_vocab_size = 2 * self.original_vocab_size
+            self.sp2_id_to_combined_id = torch.arange(self.original_vocab_size, 2 * self.original_vocab_size)
+        
+        # make sure that padding does not get remapped, stays 0
+        self.sp2_id_to_combined_id[0] = 0
+        
+        # track the reverse mapping
+        self.combined_id_to_sp2_id = {int(combined_id): sp2_id for sp2_id, combined_id in enumerate(self.sp2_id_to_combined_id)}
+        assert len(self.combined_id_to_sp2_id) == self.original_vocab_size
+        assert max(self.combined_id_to_sp2_id.keys()) == self.combined_vocab_size - 1
+
+        if verbose:
+            mprint(f"Combined two tokenisers {'with' if merge_vocab else 'without'} merging.")
+            mprint(f"\toriginal vocab size: 2 * {self.original_vocab_size}, size of combined vocab: {self.combined_vocab_size}, num merged: {2 * self.original_vocab_size - self.combined_vocab_size} (padding always merged)")
+
+        # initialize buffers
+        self.reset()
     
     def __iter__(self):
         return self
 
-    def __next__(self):
-        pass
-
     @property
     def vocab_size(self):
-        pass
+        return self.combined_vocab_size
 
     def decode(self, ids):
-        pass
+        assert ids.ndim == 1
+        if max(ids) < self.original_vocab_size:
+            # all ids are from the first tokeniser, can decode directly
+            return self.sp1.decode(ids.cpu().tolist())
+        else:
+            # some ids are from the second tokeniser, map all to second tokeniser, then decode
+            return self.sp2.decode([self.combined_id_to_sp2_id[int(x)] for x in ids])
+
+    def _fill_buffer(self, use_ds1, n=1):
+        dataset = self.ds1 if use_ds1 else self.ds2
+        buffer = self.buffer_1 if use_ds1 else self.buffer_2
+
+        for _ in range(n):
+            batch_x, batch_y, is_padded = next(dataset)
+
+            batch_x = batch_x.view(-1, self.seq_len)
+            batch_y = batch_y.view(-1, self.seq_len)
+
+            for i, idx in enumerate(self.batch_idxs):
+                buffer[idx].append((batch_x[i], batch_y[i], is_padded))
+    
+    def __next__(self):
+        # we need this complex logic because we want to sample the language per sequence, not per batch
+        batch_use_ds1 = torch.rand(len(self.batch_idxs), generator=self.torch_rng) > self.p_2
+        batch_x, batch_y, is_padded = [], [], []
+        for i, use_ds1 in enumerate(batch_use_ds1):
+            buffer = self.buffer_1 if use_ds1 else self.buffer_2
+            if len(buffer[i]) == 0:
+                self._fill_buffer(use_ds1, n=4)
+            assert len(buffer[i]) > 0
+            x, y, p = buffer[i].pop()
+
+            if not use_ds1:
+                x = self.sp2_id_to_combined_id[x]
+                y = self.sp2_id_to_combined_id[y]
+
+            batch_x.append(x)
+            batch_y.append(y)
+            is_padded.append(p)
+        
+        batch_x = torch.stack(batch_x).view(self.micro_batches, self.bsz // self.micro_batches, self.seq_len)
+        batch_y = torch.stack(batch_y).view(self.micro_batches, self.bsz // self.micro_batches, self.seq_len)
+        is_padded = any(is_padded)
+
+        return batch_x.to(self.device, non_blocking=True), batch_y.to(self.device, non_blocking=True), is_padded
+
+    def reset(self):
+        # reset state
+        self.buffer_1 = [[] for _ in self.batch_idxs]
+        self.buffer_2 = [[] for _ in self.batch_idxs]
+        self.torch_rng = torch.Generator()
+        self.torch_rng.manual_seed(self.lang_seed)
+        self.ds1.reset()
+        self.ds2.reset()
