@@ -47,7 +47,7 @@ class ClonedLanguageDataset(LanguiniDatasetIterator):
 
         # sample which cloned language to use for each sample
         cloned_lang = torch.randint(1, self.num_languages, (bsz, 1), device=self.device)
-        do_clone = torch.rand(bsz, 1, dtype=torch.float, device=self.device) < self.p_l2
+        do_clone = torch.rand(bsz, 1, dtype=torch.float, device=self.device) < self.p_clone
         lang = torch.where(do_clone, cloned_lang, 0)
         # lang i has ids [i * size, (i+1) * size)
         lang_offset = lang * self.original_vocab_size
@@ -93,10 +93,10 @@ class BilingualDataset:
             verbose (bool): whether to print information about the merged vocabularies.
         """
         self.device = kwargs["device"]
-        self.seq_len = kwargs["seq_len"]
+        self.seq_len = kwargs["sequence_length"]
         self.batch_idxs = kwargs["batch_idxs"]
         self.micro_batches = kwargs["micro_batches"]
-        self.bsz = kwargs["bsz"]
+        self.bsz = len(self.batch_idxs)
         kwargs["device"] = "cpu" # avoid cluttering the GPU as we have to buffer data
         self.ds1 = LanguiniDatasetIterator(data_path=data_path, sp=sp, **kwargs)
         self.ds2 = LanguiniDatasetIterator(data_path=data_path_2, sp=sp2, **kwargs)
@@ -174,7 +174,7 @@ class BilingualDataset:
     
     def __next__(self):
         # we need this complex logic because we want to sample the language per sequence, not per batch
-        batch_use_ds1 = torch.rand(len(self.batch_idxs), generator=self.torch_rng) > self.p_2
+        batch_use_ds1 = torch.rand(len(self.batch_idxs), generator=self.torch_rng) > self.p_l2
         batch_x, batch_y, is_padded = [], [], []
         for i, use_ds1 in enumerate(batch_use_ds1):
             buffer = self.buffer_1 if use_ds1 else self.buffer_2

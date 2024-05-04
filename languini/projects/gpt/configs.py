@@ -63,15 +63,15 @@ def load_config(name=None):
         debug = False,                      # simply adds a "_debug" suffix so logs are easily distinguishable
 
         # cloned languages
-        num_cloned_languages = 0,
-        p_clone = None,
-        frac_clone = None,
+        num_cloned_languages = 0,           # how many cloned languages to add
+        p_clone = None,                     # proability of sampling from the cloned languages (uniform from L2, L3, L4, ... if num_cloned_languages > 1)
+        frac_clone = None,                  # fraction of the vocabulary that is cloned
 
         # multiple languages
-        data_root_2 = None,
-        dataset_2 = None,
-        p_l2 = None,
-        merge_vocab = None,
+        data_root_2 = None,                  # e.g. "data/french-pd-books"
+        dataset_2 = None,                    # e.g. "french_books_16384",
+        p_l2 = None,                         # probability of sampling from the second language/dataset
+        merge_vocab = False,                 # whether to merge the vocabularies of the two languages/tokenizers
 
         # optimiser
         seed = 0,

@@ -112,7 +112,6 @@ def run(config, logger):
         full_data_path_2 = os.path.join(c.data_root_2, c.dataset_2)
         mprint(f"Loading data from {full_data_path_2}")
         bilingual_args = dict(
-            data_path_1=full_data_path,
             data_path_2=full_data_path_2,
             sp2=train_utils.load_tokeniser(name=c.dataset_2),
             merge_vocab=c.merge_vocab,
