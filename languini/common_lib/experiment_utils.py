@@ -197,3 +197,13 @@ def load_wandb_checkpoint_and_config(run_path):
         raise FileNotFoundError(f"Could not load config file from wandb run {run_path}")
     return checkpoint_file, config_file
 
+
+def log_wandb_summary_metrics(run_path, metrics):
+    """
+    Add metrics to the summary of a wandb run.
+    """
+    project, run_id = run_path.split("/")[-2:]
+    wandb.init(project=project, resume="must", id=run_id)
+    for k, v in metrics.items():
+        wandb.summary[k] = v
+    wandb.finish()

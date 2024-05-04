@@ -122,7 +122,7 @@ def run(config, language):
     else:
         # Standard monolingual dataset
         assert not language
-        ds = languini_books.LanguiniBooksDataset(**ds_args)
+        ds = languini_books.LanguiniDatasetIterator(**ds_args)
     assert c.get("vocab_size") is None or c.vocab_size == ds.vocab_size
     c.vocab_size = ds.vocab_size
 
@@ -174,6 +174,16 @@ def run(config, language):
     
     mprint("Done!")
 
+    return {
+        "num_tokens": int(eval_token_count),
+        "total_loss": float(eval_total_loss),
+        "avg_loss": float(eval_avg_loss),
+        "ppl": float(eval_ppl),
+        "normalised_loss": float(eval_norm_loss),
+        "normalised_ppl": float(eval_norm_ppl),
+        **{f"top-{k}": float(v) for k, v in eval_topk_accs.items()},
+    }
+
 
 def main():
     """Load relevant args and evaluate on some data split."""
@@ -214,7 +224,22 @@ def main():
     config.last_n = args.last_n if args.last_n > 0 else config.seq_len
     config.device = device
 
-    run(config, language=args.language)
+    metrics = run(config, language=args.language)
+
+    # name the results
+    results_identifier = f"{args.eval_data_split}_{args.last_n}"
+    if args.language:
+        results_identifier += f"_{args.language}"
+
+    if args.wandb_run:
+        print("Uploading results to wandb ...")
+        # update the run's summary metrics
+        experiment_utils.log_wandb_summary_metrics(
+            args.wandb_run,
+            {f"{results_identifier}/{k}": v for k, v in metrics.items()}
+        )
+
+    print("Done.")
 
 
 if __name__ == "__main__":
