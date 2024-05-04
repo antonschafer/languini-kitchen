@@ -59,8 +59,19 @@ def load_config(name=None):
         data_root = "data/books",
         relative_log_path = "logs",         # Relative path to the log folder within the project folder languini-kitchen/projects/gpt/logs/
         dataset = "books_16384",
-        vocab_size = 16384,
+        vocab_size = None,                  # to be set by the dataset
         debug = False,                      # simply adds a "_debug" suffix so logs are easily distinguishable
+
+        # cloned languages
+        num_cloned_languages = 0,
+        p_clone = None,
+        frac_clone = None,
+
+        # multiple languages
+        data_root_2 = None,
+        dataset_2 = None,
+        p_l2 = None,
+        merge_vocab = None,
 
         # optimiser
         seed = 0,

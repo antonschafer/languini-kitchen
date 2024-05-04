@@ -66,7 +66,7 @@ def distribute_docs(book_lengths, batch_size):
 
 
 class LanguiniDatasetIterator:
-    def __init__(self, data_path, split, global_batch_size, batch_idxs, micro_batches, sequence_length, device, end_of_doc_token, shift_n=-1, repeat=False, buffer_size=4096*10):
+    def __init__(self, data_path, split, global_batch_size, batch_idxs, micro_batches, sequence_length, device, end_of_doc_token, sp, shift_n=-1, repeat=False, buffer_size=4096*10):
         """
         Initialise the dataset iterator. 
 
@@ -79,6 +79,7 @@ class LanguiniDatasetIterator:
             sequence_length (int): sequence length of each batch.
             device (int): cuda device to which we will copy the data.
             end_of_doc_token (int): id of the end of document token in the vocab to be inserted between docs.
+            sp: SentencePiece tokenizer.
             shift_n (int): The number of tokens to remove from the queue. If stream_n == -1, it will remove the entire batch from the queue. Otherwise, just stream_n tokens. 
             repeat (bool): if a document queue should just repeat once it reached the end.
             buffer_size (int): size of the token buffer.
@@ -95,6 +96,8 @@ class LanguiniDatasetIterator:
         self.repeat = repeat
         self.shift_n = shift_n
         self.buffer_size = buffer_size
+        self.sp = sp
+        self.vocab_size = sp.vocab_size()
 
         # The number of tokens we shift after a batch is the sequence length if shift_n == -1. Otherwise it is the sequence length. It cannot be 0 or larger than the sequence length.
         assert self.shift_n <= self.seq_len and self.shift_n != 0, "Cannot shift 0 tokens or more tokens than there are in a sequence!"
@@ -294,3 +297,7 @@ class LanguiniDatasetIterator:
         batch_y = seq[:, :, 1:]
 
         return batch_x, batch_y, is_padded
+
+    def decode(self, ids):
+        assert ids.ndim == 1
+        return self.sp.decode(ids.cpu().tolist())

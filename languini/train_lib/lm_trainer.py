@@ -149,7 +149,7 @@ def evaluation(config, model, state, data_source, max_steps, last_n=-1, print_pr
     return total_loss.item(), total_top_k_counts, total_token_count.item(), state
 
 
-def log_eval_stats(eval_data_source, eval_steps, last_n, sp, logger, device):
+def log_eval_stats(eval_data_source, eval_steps, last_n, logger, device):
     """Counts the number of eval batches and the length in string bytes. Saves these values for later."""
     eval_data_source.reset()
     eval_batches = eval_data_source if eval_steps == -1 else itertools.islice(eval_data_source, eval_steps)
@@ -171,9 +171,7 @@ def log_eval_stats(eval_data_source, eval_steps, last_n, sp, logger, device):
 
         # decode targets and measure length
         batch_y = torch.reshape(batch_y, (batch_y.shape[0] * batch_y.shape[1], -1))
-        str_lst = sp.decode(batch_y.cpu().tolist())
-        for str in str_lst:
-            str_length += len(str)
+        str_length += sum(len(eval_data_source.decode(seq)) for seq in batch_y)
 
         # count non-padding tokens
         token_count += torch.sum(batch_y != 0) if is_padded else batch_y.numel()
@@ -226,15 +224,10 @@ class LMTrainer:
             self.model, self.curr_state = train_utils.load_checkpoint(model=self.model, path=c.checkpoint_path)
             print(f"Model checkpoint and state loaded from {c.checkpoint_path}")
 
-        # load tokeniser
-        self.sp = train_utils.load_tokeniser(config=c)
-        assert self.c.vocab_size == self.sp.vocab_size(), f"config vocab size {c.vocab_size} doesn't match tokeniser vocab size {self.sp.vocab_size()}"
-
         # get number of eval steps and total eval bytes since that will be the same for every evaluation run
         parallel_utils.mprint("Measure evaluation data size ...")
         self.eval_bytes, _, _ = log_eval_stats(eval_data_source=self.eval_batches,
                                                eval_steps=self.c.max_eval_steps,
-                                               sp=self.sp,
                                                logger=self.logger,
                                                device=self.c.device,
                                                last_n=self.c.seq_len)

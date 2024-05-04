@@ -19,7 +19,9 @@ class ClonedLanguageDataset(LanguiniDatasetIterator):
             frac_clone (float): fraction of the vocabulary to clone.
             sp: SentencePiece tokenizer.
         """
-        super().__init__(**kwargs)
+        assert num_languages > 1
+        assert frac_clone == 1.0 or num_languages == 2, "not supported"
+        super().__init__(**kwargs, sp=sp)
         self.num_languages = num_languages
         self.p_clone = p_clone
         self.frac_clone = frac_clone
@@ -34,6 +36,8 @@ class ClonedLanguageDataset(LanguiniDatasetIterator):
         random.Random(clone_seed).shuffle(all_ids)
         for i in all_ids[:self.n_cloned]:
             self.is_cloned[i] = True
+
+        self.vocab_size = self.original_vocab_size * self.num_languages
 
     def __next__(self):
         batch_x, batch_y, is_padded = super().__next__()
@@ -55,10 +59,6 @@ class ClonedLanguageDataset(LanguiniDatasetIterator):
 
         return batch_x, batch_y, is_padded
 
-    @property
-    def vocab_size(self):
-        return self.original_vocab_size * self.num_languages
-
     def decode(self, ids):
         assert ids.ndim == 1
         # map to original vocab
@@ -70,11 +70,9 @@ class BilingualDataset:
     def __init__(
             self,
             *,
-            data_path_1,
-            split_1,
+            data_path,
             data_path_2,
-            split_2,
-            sp1,
+            sp,
             sp2,
             merge_vocab,
             p_l2,
@@ -86,11 +84,9 @@ class BilingualDataset:
 
         Args:
             same as LanguiniDatasetIterator. Additionally:
-            data_path_1 (str): path to the first dataset.
+            data_path (str): path to the first dataset.
             data_path_2 (str): path to the second dataset.
-            split_1 (str): split of the first dataset.
-            split_2 (str): split of the second dataset.
-            sp_1: SentencePiece tokenizer for the first language.
+            sp: SentencePiece tokenizer for the first language.
             sp_2: SentencePiece tokenizer for the second language.
             merge_vocab (bool): whether to merge the vocabularies.
             p_l2 (float): probability of using the second language for a sample.
@@ -102,17 +98,17 @@ class BilingualDataset:
         self.micro_batches = kwargs["micro_batches"]
         self.bsz = kwargs["bsz"]
         kwargs["device"] = "cpu" # avoid cluttering the GPU as we have to buffer data
-        self.ds1 = LanguiniDatasetIterator(data_path=data_path_1, split=split_1, **kwargs)
-        self.ds2 = LanguiniDatasetIterator(data_path=data_path_2, split=split_2, **kwargs)
-        self.sp1 = sp1
+        self.ds1 = LanguiniDatasetIterator(data_path=data_path, sp=sp, **kwargs)
+        self.ds2 = LanguiniDatasetIterator(data_path=data_path_2, sp=sp2, **kwargs)
+        self.sp1 = sp
         self.sp2 = sp2
         self.merge_vocab = merge_vocab
         self.p_l2 = p_l2
         self.lang_seed = 0
 
-        if sp1.vocab_size() != sp2.vocab_size():
+        if sp.vocab_size() != sp2.vocab_size():
             raise NotImplementedError("Vocabularies must have the same size.")
-        self.original_vocab_size = sp1.vocab_size()
+        self.original_vocab_size = sp.vocab_size()
 
         # create the combined vocabulary
         if merge_vocab:
@@ -148,13 +144,11 @@ class BilingualDataset:
 
         # initialize buffers
         self.reset()
+
+        self.vocab_size = self.combined_vocab_size
     
     def __iter__(self):
         return self
-
-    @property
-    def vocab_size(self):
-        return self.combined_vocab_size
 
     def decode(self, ids):
         assert ids.ndim == 1
