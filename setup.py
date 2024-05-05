@@ -33,6 +33,7 @@ install_requires_core = [
     "jupyter",
     "deepspeed==0.10.3",
     "seaborn",
+    "networkx",
 ]
 
 setup(
