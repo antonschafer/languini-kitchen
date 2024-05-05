@@ -85,10 +85,10 @@ class ParallelDataset:
     where x and y are of shape (bsz, seqlen) 
     """
 
-    def __init__(self, bsz, device, tokens_l1, tokens_l2):
+    def __init__(self, batch_size, device, tokens_l1, tokens_l2):
         """
         Args:
-            bsz: batch size
+            batch_size: batch size
             device: device
             tokens_l1: tensor (n_samples, seqlen) of tokenised sequences for language 1
             tokens_l2: tensor (n_samples, seqlen) of tokenised sequences for language 2
@@ -98,15 +98,15 @@ class ParallelDataset:
         self.tokens_l2 = tokens_l2
         self.idx = 0
         self.device = device
-        self.bsz = bsz
+        self.bsz = batch_size
     
     def __next__(self):
         if self.idx + self.bsz > len(self.tokens_l1):
             raise StopIteration()
         curr_slice = slice(self.idx, self.idx+self.bsz)
         # retrieve batch
-        x_l1 = self.tokens_l1[curr_slice]
-        x_l2 = self.tokens_l2[curr_slice]
+        x_l1 = self.tokens_l1[curr_slice].to(self.device)
+        x_l2 = self.tokens_l2[curr_slice].to(self.device)
         # create y
         y_l1, y_l2 = torch.zeros_like(x_l1), torch.zeros_like(x_l2)
         y_l1[:, :-1] = x_l1[:, 1:] # last token in y is 0 (padding)
@@ -118,21 +118,21 @@ class ParallelDataset:
     
 
 class ParallelEnFrDataset(ParallelDataset):
-    def __init__(self, bsz, device, combined_tokeniser, dataset_dir="data/fr-en"):
+    def __init__(self, batch_size, device, combined_tokeniser, dataset_dir="data/fr-en"):
         monoling_vocab_size = combined_tokeniser.original_vocab_size
         tokens_en = torch.load(os.path.join(dataset_dir, f"tokenised_en_{monoling_vocab_size}.pt"))
         tokens_fr = torch.load(os.path.join(dataset_dir, f"tokenised_fr_{monoling_vocab_size}.pt"))
         tokens_en = combined_tokeniser.map_ids(tokens_fr, is_l2=False)
         tokens_fr = combined_tokeniser.map_ids(tokens_fr, is_l2=True)
-        super().__init__(bsz, device, tokens_en, tokens_fr)
+        super().__init__(batch_size, device, tokens_en, tokens_fr)
 
 
 class ParallelEn1En2Dataset(ParallelDataset):
     """only works for fully duplicated vocab!"""
-    def __init__(self, bsz, device, original_vocab_size, dataset_dir="data/fr-en"):
+    def __init__(self, batch_size, device, original_vocab_size, dataset_dir="data/fr-en"):
         self.tokens_en_1 = torch.load(os.path.join(dataset_dir, f"tokenised_en_{original_vocab_size}.pt"))
-        self.tokens_en_2 = self.tokens_en_1.clone() + original_vocab_size
-        super().__init__(bsz, device, self.tokens_en_1, self.tokens_en_2)
+        self.tokens_en_2 = torch.where(self.tokens_en_1 > 0, self.tokens_en_1 + original_vocab_size, 0) # 0 is padding
+        super().__init__(batch_size, device, self.tokens_en_1, self.tokens_en_2)
 
 
 if __name__ == "__main__":
