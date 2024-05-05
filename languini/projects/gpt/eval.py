@@ -96,7 +96,7 @@ def run(config, language):
     if c.num_cloned_languages > 0:
         # Cloned dataset
         assert language in ["L1", "L2"]
-        assert c.data_root_2 is None
+        assert not c.data_root_2
         ds = multilingual.ClonedLanguageDataset(
             num_languages=2, # HACK
             p_clone=0 if language == "L1" else 1,
@@ -106,7 +106,7 @@ def run(config, language):
         # HACK: this (along with num_languages=2 above) is a nasty hack to always use L2 even if we have L3, L4, ...
         # TODO: solve cleaner
         ds.vocab_size = ds.original_vocab_size * (1 + c.num_cloned_languages)
-    elif c.data_root_2 is not None:
+    elif c.data_root_2:
         # Bilingual dataset
         assert language in ["L1", "L2"]
         full_data_path_2 = os.path.join(c.data_root_2, c.dataset_2)

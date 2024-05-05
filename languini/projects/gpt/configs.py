@@ -64,17 +64,17 @@ def load_config(name=None):
 
         # cloned languages
         num_cloned_languages = 0,           # how many cloned languages to add
-        p_clone = None,                     # proability of sampling from the cloned languages (uniform from L2, L3, L4, ... if num_cloned_languages > 1)
-        frac_clone = None,                  # fraction of the vocabulary that is cloned
+        p_clone = 0.0,                        # proability of sampling from the cloned languages (uniform from L2, L3, L4, ... if num_cloned_languages > 1)
+        frac_clone = 0.0,                     # fraction of the vocabulary that is cloned
 
         # multiple languages
-        data_root_2 = None,                  # e.g. "data/french-pd-books"
-        dataset_2 = None,                    # e.g. "french_books_16384",
-        p_l2 = None,                         # probability of sampling from the second language/dataset
+        data_root_2 = "",                    # e.g. "data/french-pd-books"
+        dataset_2 = "",                      # e.g. "french_books_16384",
+        p_l2 = 0.0,                          # probability of sampling from the second language/dataset
         merge_vocab = False,                 # whether to merge the vocabularies of the two languages/tokenizers
 
         # scheduler of language ratio
-        language_schedule = None,            # e.g. 0.1_0.9_0.5_0.5 for 4 stages of 10%, 90%, 50%, 50% p_l2/p_clone respectively
+        language_schedule = "",            # e.g. 0.1_0.9_0.5_0.5 for 4 stages of 10%, 90%, 50%, 50% p_l2/p_clone respectively
 
         # optimiser
         seed = 0,

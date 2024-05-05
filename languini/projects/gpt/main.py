@@ -99,7 +99,7 @@ def run(config, logger):
     )
     if c.num_cloned_languages > 0:
         # Cloned dataset
-        assert c.data_root_2 is None
+        assert not c.data_root_2
         clone_args = dict(
             num_languages=c.num_cloned_languages + 1,
             p_clone=c.p_clone,
@@ -107,7 +107,7 @@ def run(config, logger):
         )
         train_ds = multilingual.ClonedLanguageDataset(**train_ds_args, **clone_args)
         eval_ds = multilingual.ClonedLanguageDataset(**eval_ds_args, **clone_args)
-    elif c.data_root_2 is not None:
+    elif c.data_root_2:
         # Bilingual dataset
         full_data_path_2 = os.path.join(c.data_root_2, c.dataset_2)
         mprint(f"Loading data from {full_data_path_2}")
@@ -130,12 +130,12 @@ def run(config, logger):
     ## Setup language schedule
     if c.language_schedule:
         mprint("Using language schedule ...")
-        assert c.num_cloned_languages > 0 or c.data_root_2 is not None
+        assert c.num_cloned_languages > 0 or c.data_root_2
         language_scheduler = multilingual.LanguageScheduler(
             c.language_schedule,
             n_total_steps=c.max_train_steps,
             datasets=[train_ds, eval_ds],
-            attr_name="p_l2" if c.data_root_2 is not None else "p_clone",
+            attr_name="p_l2" if c.data_root_2 else "p_clone",
         )
     else:
         language_scheduler = None
