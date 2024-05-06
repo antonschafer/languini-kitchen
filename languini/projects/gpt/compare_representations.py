@@ -1,4 +1,5 @@
 from collections import defaultdict
+import os
 import sys
 import torch
 import pickle
@@ -178,15 +179,7 @@ def run(config, checkpoint_file, n_steps):
 
 
     hidden_sims, grad_sims = compute_similarities(model, parallel_dataset, n_steps, matching_type)
-    metrics = {}
-    for layer, sims in enumerate(hidden_sims):
-        metrics[f"hidden_sim_layer_{layer}_mean"] = sims.mean()
-        metrics[f"hidden_sim_layer_{layer}_std"] = sims.std()
-    for param_name, sims in grad_sims.items():
-        metrics[f"grad_sim_'{param_name}'_mean"] = sims.mean()
-        metrics[f"grad_sim_'{param_name}'_std"] = sims.std()
-
-    return metrics
+    return hidden_sims, grad_sims
 
 
 def main():
@@ -198,6 +191,7 @@ def main():
     parser.add_argument("--config_file", default="", type=str, help=f"Model config to load.")
     parser.add_argument("--wandb_run", default="", type=str, help=f"Wandb run to load model config and checkpoint from.")
     parser.add_argument("--n_steps", default=500, type=int, help=f"Number of sequences to process.")
+    parser.add_argument("--out_dir", default="", type=str, help=f"Local directory to save results to.")
     args = parser.parse_args(sys.argv[1:])
 
     # download file from wandb if necessary
@@ -210,23 +204,18 @@ def main():
         config = pickle.load(f)
     mprint(f"original experiment name: {config.exp_name}")
 
-    metrics = run(config, checkpoint_file=args.checkpoint_file, n_steps=args.n_steps)
+    hidden_sims, grad_sims = run(config, checkpoint_file=args.checkpoint_file, n_steps=args.n_steps)
+
+    if args.out_dir:
+        os.makedirs(args.out_dir, exist_ok=True)
+        np.save(os.path.join(args.out_dir, "hidden_sims.npy"), hidden_sims)
+        with open(os.path.join(args.out_dir, "grad_sims.pkl"), "wb") as f:
+            pickle.dump(grad_sims, f)
 
     # display summary
     print("Hidden state mean cosine similarities")
-    for k, v in metrics.items():
-        if k.startswith("hidden_sim") and k.endswith("mean"):
-            print(f"\tLayer {k.split('_')[3]}: {v:.4f}")
-
-    # upload to wandb
-    results_identifier = f"cossims_{args.n_steps}"
-    if args.wandb_run:
-        print("Uploading results to wandb ...")
-        # update the run's summary metrics
-        experiment_utils.log_wandb_summary_metrics(
-            args.wandb_run,
-            {f"{results_identifier}/{k}": v for k, v in metrics.items()}
-        )
+    for i, layer_sims in enumerate(hidden_sims):
+        print(f"\tLayer {i}: {layer_sims.mean():.4f} +/- {layer_sims.std():.4f}")
 
     print("Done.")
 
