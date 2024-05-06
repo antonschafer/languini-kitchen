@@ -126,6 +126,7 @@ def run(config, logger):
         eval_ds = languini_books.LanguiniDatasetIterator(**eval_ds_args)
     assert train_ds.vocab_size == eval_ds.vocab_size
     c.vocab_size = train_ds.vocab_size
+    logger.save_file(config, "config.pickle") # update config with vocab size TODO cleaner solution
 
     ## Setup language schedule
     if c.language_schedule:
