@@ -1,3 +1,5 @@
+# runs word2vec on 2 cloned languages. E.g. python -m languini.projects.word2vec.main --p_clone 0.5
+
 import os
 import itertools
 import argparse
@@ -12,7 +14,6 @@ from languini.train_lib import train_utils
 
 
 def main():
-    # arguments, see languini/projects/gpt/configs.py for meaning of each argument
     parser = argparse.ArgumentParser()
     # cloning args
     parser.add_argument('--p_clone', type=float, default=0.0)
@@ -103,7 +104,7 @@ def main():
     with open(os.path.join(config.output_dir, "config.pkl"), "wb") as f:
         pickle.dump(config, f)
 
-    print("Done.")
+    print("Done. Results saved to", config.output_dir)
 
 if __name__ == "__main__":
     main()
