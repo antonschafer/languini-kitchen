@@ -29,6 +29,7 @@ def compute_similarities(model, parallel_data_source, n_steps, matching_type):
         matching_type: how to match the tokens of the two sequences that are compared with each other. Options are:
             - "one_by_one": compare the hidden states of the two sequences one by one
             - "max_matching": compute a maximum matching in the bipartite graph with similarity as edge weights
+                TODO this is really slow and memory heavy right now
     
     Returns: Tuple
         hidden_state_cossims: array of cosine similaritites (n_layers, n_steps)
@@ -93,7 +94,7 @@ def compute_similarities(model, parallel_data_source, n_steps, matching_type):
             cossim_alltoall = F.cosine_similarity(hs_1.unsqueeze(2), hs_2.unsqueeze(1), dim=3)
             check(cossim_alltoall, (n_layers, S1, S2))
             # match according to max average similarity over layers
-            matching_mask = compute_max_matching(cossim_alltoall.mean(dim=0))
+            matching_mask = compute_max_matching(cossim_alltoall.mean(dim=0).cpu()).to(hs_1.device)
             # mask[i, j] true iff i-th token in sequence 1 matched with j-th token in sequence 2
             check(matching_mask, (S1, S2))
             assert matching_mask.sum() > 0

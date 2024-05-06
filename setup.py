@@ -34,6 +34,7 @@ install_requires_core = [
     "deepspeed==0.10.3",
     "seaborn",
     "networkx",
+    "scipy",
 ]
 
 setup(

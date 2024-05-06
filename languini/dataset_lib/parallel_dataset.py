@@ -111,6 +111,8 @@ class ParallelDataset:
         y_l1, y_l2 = torch.zeros_like(x_l1), torch.zeros_like(x_l2)
         y_l1[:, :-1] = x_l1[:, 1:] # last token in y is 0 (padding)
         y_l2[:, :-1] = x_l2[:, 1:]
+
+        self.idx += self.bsz
         return (x_l1, y_l1, True), (x_l2, y_l2, True)
     
     def reset(self):

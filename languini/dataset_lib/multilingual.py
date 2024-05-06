@@ -108,6 +108,8 @@ class CombinedTokenizer:
         if sp1.vocab_size() != sp2.vocab_size():
             raise NotImplementedError("Vocabularies must have the same size.")
         self.original_vocab_size = sp1.vocab_size()
+        self.sp1 = sp1
+        self.sp2 = sp2
 
         # create the combined vocabulary
         if merge_vocab:
@@ -197,8 +199,6 @@ class BilingualDataset:
         kwargs["device"] = "cpu" # avoid cluttering the GPU as we have to buffer data
         self.ds1 = LanguiniDatasetIterator(data_path=data_path, sp=sp, **kwargs)
         self.ds2 = LanguiniDatasetIterator(data_path=data_path_2, sp=sp2, **kwargs)
-        self.sp1 = sp
-        self.sp2 = sp2
         self.merge_vocab = merge_vocab
         self.p_l2 = p_l2
         self.lang_seed = 0
