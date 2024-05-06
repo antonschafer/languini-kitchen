@@ -51,17 +51,6 @@ def run(config, language):
     mprint(f"WORLD_RANK: {WORLD_RANK}")  # unique id within all devices
     mprint(f"LOCAL_RANK: {LOCAL_RANK}")  # unique id within the devices of this node
     
-    # Build model and load it from checkpoint
-    torch.manual_seed(c.seed)
-    model = Model(config=c)
-    if c.compile != "None":
-        model = torch.compile(model, mode=c.compile)
-    model = model.to(c.device)
-    device_ids = [LOCAL_RANK] if c.device.type == "cuda" else None
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=device_ids)  # we always use DDP so we can easily load models 
-    model, curr_state = train_utils.load_checkpoint(model, c.checkpoint_file)
-    mprint(f"Model checkpoint and state loaded from {c.checkpoint_file}")
-
     # load tokeniser
     sp = train_utils.load_tokeniser(name=c.dataset)
 
@@ -126,6 +115,16 @@ def run(config, language):
     assert c.get("vocab_size") is None or c.vocab_size == ds.vocab_size
     c.vocab_size = ds.vocab_size
 
+    # Build model and load it from checkpoint
+    torch.manual_seed(c.seed)
+    model = Model(config=c)
+    if c.compile != "None":
+        model = torch.compile(model, mode=c.compile)
+    model = model.to(c.device)
+    device_ids = [LOCAL_RANK] if c.device.type == "cuda" else None
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=device_ids)  # we always use DDP so we can easily load models 
+    model, curr_state = train_utils.load_checkpoint(model, c.checkpoint_file)
+    mprint(f"Model checkpoint and state loaded from {c.checkpoint_file}")
 
     mprint("Measure test data size ...")
     eval_bytes, batch_count, token_count = lm_trainer.log_eval_stats(eval_data_source=ds,
