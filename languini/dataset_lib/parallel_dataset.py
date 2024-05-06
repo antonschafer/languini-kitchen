@@ -124,7 +124,7 @@ class ParallelEnFrDataset(ParallelDataset):
         monoling_vocab_size = combined_tokeniser.original_vocab_size
         tokens_en = torch.load(os.path.join(dataset_dir, f"tokenised_en_{monoling_vocab_size}.pt"))
         tokens_fr = torch.load(os.path.join(dataset_dir, f"tokenised_fr_{monoling_vocab_size}.pt"))
-        tokens_en = combined_tokeniser.map_ids(tokens_fr, is_l2=False)
+        tokens_en = combined_tokeniser.map_ids(tokens_en, is_l2=False)
         tokens_fr = combined_tokeniser.map_ids(tokens_fr, is_l2=True)
         super().__init__(batch_size, device, tokens_en, tokens_fr)
 

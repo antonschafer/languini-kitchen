@@ -207,7 +207,7 @@ class BilingualDataset:
         # initialize buffers
         self.reset()
 
-        self.vocab_size = self.combined_vocab_size
+        self.vocab_size = self.combined_tokeniser.combined_vocab_size
     
     def __iter__(self):
         return self
