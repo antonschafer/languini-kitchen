@@ -6,7 +6,7 @@ from languini.train_lib import train_utils
 # wrapper around sentencepiece tokenizer to be compatible with huggingface tokenizers
 class HFTokenizer:
     def __init__(self, config):
-        self.sp = train_utils.load_tokeniser(config=config)
+        self.sp = train_utils.load_tokeniser(name=config.dataset)
         self.model_max_length = config.seq_len # TODO
 
         # use end of doc token as eos token
