@@ -153,9 +153,9 @@ These are the current models which are implemented within languini. You can find
 
 | Model | Project | Brief Description |
 | :--: | :--: | :--: |
-| [GPT](languini/projects/gpt/) | Initial Baselines | GPT-2 inspired transformer baseline | 
-| [LSTM](languini/projects/lstm/) | Initial Baselines | Classic LSTM |  
-| [Quasi-LSTM](languini/projects/lstm/) | Initial Baselines | Quasi LSTM with block-parallel implementation | 
+| [GPT](../languini/projects/gpt/) | Initial Baselines | GPT-2 inspired transformer baseline | 
+| [LSTM](../languini/projects/lstm/) | Initial Baselines | Classic LSTM |  
+| [Quasi-LSTM](../languini/projects/lstm/) | Initial Baselines | Quasi LSTM with block-parallel implementation | 
 
 
 ## Frequently Asked Questions
