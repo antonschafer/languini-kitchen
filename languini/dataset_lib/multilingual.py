@@ -239,9 +239,8 @@ class BilingualDataset:
             assert len(buffer[i]) > 0
             x, y, p = buffer[i].pop()
 
-            if not use_ds1:
-                x = self.sp2_id_to_combined_id[x]
-                y = self.sp2_id_to_combined_id[y]
+            x = self.combined_tokeniser.map_ids(x, not use_ds1)
+            y = self.combined_tokeniser.map_ids(y, not use_ds1)
 
             batch_x.append(x)
             batch_y.append(y)
