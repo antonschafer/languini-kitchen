@@ -101,7 +101,6 @@ def run(config, language):
         full_data_path_2 = os.path.join(c.data_root_2, c.dataset_2)
         mprint(f"Loading \"{c.eval_data_split}\" from {full_data_path_2}")
         ds = multilingual.BilingualDataset(
-            data_path_1=full_data_path,
             data_path_2=full_data_path_2,
             p_l2=0 if language == "L1" else 1,
             merge_vocab=c.merge_vocab,
