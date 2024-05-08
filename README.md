@@ -5,7 +5,7 @@ Code to the paper [Language Imbalance Can Boost Cross-lingual Generalisation](ht
 ## Reproducing Plots
 To reproduce the plots from the paper without retraining models, you can load the relevant results via
 ```
-wget https://y5d6.c15.e2-3.dev/public-bucket/results_xling.zip -O
+wget https://y5d6.c15.e2-3.dev/public-bucket/results_xling.zip -O results_xling.zip
 unzip results_xling.zip
 ```
 then install languini in a new environment
@@ -33,7 +33,7 @@ Setup the environment as described above and load and tokenize the datasets:
 Train models as described in Languini. Configure the language splits via the config arguments
 - For cloned languages:
     - `num_cloned_languages`: number of cloned languages to introduce. E.g., to train on $\mathrm{EN}_1, \mathrm{EN}_2$, introduce $\mathrm{EN}_2$ by setting `num_cloned_languages = 1`.
-    - `p_clone`: probability of sampling from the cloned language. E.g., when training with $\mathrm{EN}_1$ and $\mathrm{EN}_2$, `p_clone`=$\mathrm{EN}_2/\mathrm{EN}_1$. For >2 cloned languages, we use a cloned language which probability `p_clone` and sample uniformly which one to use.
+    - `p_clone`: probability of sampling from the cloned language. E.g., when training with $\mathrm{EN}_1$ and $\mathrm{EN}_2$, `p_clone` = $\mathrm{EN}_2/\mathrm{EN}_1$. For >2 cloned languages, we use a cloned language which probability `p_clone` and sample uniformly which one to use.
     - `frac_clone`: fraction of the vocabulary to clone.
 - For extra real languages (only French supported):
     - `data_root_2`: `"data/french-pd-books"` for french.
@@ -89,7 +89,7 @@ if you specify a wandb run, this will automatically load the checkpoint from the
 ### Representation Similarity
 To compare a model's hidden states and gradients when fed parallel sequences in its two languages ($\mathrm{EN}_1, \mathrm{EN}_2$ or $\mathrm{EN}, \mathrm{FR}$, depending on how it was trained) run
 ```
-python -m languini.projects.gpt.compare_representations --wandb_run "path/of/your/wandb/run"
+python -m languini.projects.gpt.compare_representations --wandb_run "path/of/your/wandb/run" --out_dir "some/dir"
 
 # or specify checkpoint_file and config_file instead of wandb_run
 ```
