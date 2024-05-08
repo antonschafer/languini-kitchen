@@ -19,7 +19,7 @@ and run the [analysis notebook](analysis.ipynb).
 
 ## Training and Evaluating Models
 
-You can also train models on cloned languages or on French data as in the paper:
+You can also train models on cloned languages or on French data as in the paper. Note that the numbers may not match exactly as the code cleanup slightly altered the randomness, yet the trends should be consistent.
 
 ### Setup
 Setup the environment as described above and load and tokenize the datasets:
