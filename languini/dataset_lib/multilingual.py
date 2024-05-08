@@ -68,27 +68,41 @@ class ClonedLanguageDataset(LanguiniDatasetIterator):
         random.Random(clone_seed).shuffle(all_ids)
         for i in all_ids[:self.n_cloned]:
             self.is_cloned[i] = True
+        
+        # randomly select a fraction of subwords that are independent on sequence langauge
+        # currently not supported
+        self.frac_independent = 0.0 
+        self.is_independent = torch.zeros_like(self.is_cloned)
 
         self.vocab_size = self.original_vocab_size * self.num_languages
 
     def __next__(self):
-        batch_x, batch_y, is_padded = super().__next__()
+        seq, is_padded = super().__next__(return_seq=True)
 
-        micro_batches, micro_bsz, seqlen = batch_x.shape
+        micro_batches, micro_bsz, seqlen_plus1 = seq.shape
         bsz = micro_batches * micro_bsz
 
-        # sample which cloned language to use for each sample
+        # sample which cloned language to use for each sequence
         cloned_lang = torch.randint(1, self.num_languages, (bsz, 1), device=self.device)
-        do_clone = torch.rand(bsz, 1, dtype=torch.float, device=self.device) < self.p_clone
-        lang = torch.where(do_clone, cloned_lang, 0)
+        do_clone_seq = torch.rand(bsz, 1, dtype=torch.float, device=self.device) < self.p_clone
+        lang = torch.where(do_clone_seq, cloned_lang, 0)
+        # repeat for each token in the sequence
+        lang = lang.view(micro_batches, micro_bsz, 1).expand(seq.shape)
+
+        # resample for the tokens that are independent of the sequence language (only supported for 2 languages)
+        assert self.num_languages == 2 or self.frac_independent == 0, "not supported"
+        do_clone_tok = torch.rand_like(seq, dtype=torch.float) < self.p_clone
+        lang = torch.where(self.is_independent[seq], do_clone_tok, lang)
+
         # lang i has ids [i * size, (i+1) * size)
         lang_offset = lang * self.original_vocab_size
-
         # map to vocabulary of the "language", don't map padding (0), only map cloned subwords
-        lang_offset = lang_offset.view(micro_batches, micro_bsz, 1)
-        batch_x = torch.where((batch_x > 0) & self.is_cloned[batch_x], batch_x + lang_offset, batch_x)
-        batch_y = torch.where((batch_y > 0) & self.is_cloned[batch_y], batch_y + lang_offset, batch_y)
+        seq = torch.where((seq > 0) & self.is_cloned[seq], seq + lang_offset, seq)
 
+        batch_x = seq[:, :, :-1]
+        batch_y = seq[:, :, 1:]
+        print(batch_x)
+        print(batch_y)
         return batch_x, batch_y, is_padded
 
     def decode(self, ids):

@@ -226,7 +226,7 @@ class LanguiniDatasetIterator:
         # Reset buffer position
         self.buffer_pos[index] = 0
     
-    def __next__(self):
+    def __next__(self, return_seq=False):
         """
         Method to obtain the next batch of sequences. It will check if the buffer needs to be refilled. 
         If so, it calls the _fill_buffer method (sequentially). After that, it builds a new batch from the buffer.
@@ -292,11 +292,14 @@ class LanguiniDatasetIterator:
         seq = torch.reshape(seq, (self.micro_batches, self.bsz // self.micro_batches, self.seq_len + 1))
         seq = seq.to(self.device, non_blocking=True)
 
-        # Create batches
-        batch_x = seq[:, :, :-1]
-        batch_y = seq[:, :, 1:]
+        if return_seq:
+            return seq, is_padded
+        else:
+            # Create batches
+            batch_x = seq[:, :, :-1]
+            batch_y = seq[:, :, 1:]
 
-        return batch_x, batch_y, is_padded
+            return batch_x, batch_y, is_padded
 
     def decode(self, ids):
         assert ids.ndim == 1
